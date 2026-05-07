@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="theme-color" content="#1a365d"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Production"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="icons/icon-192.png"/>
+<title>ระบบใบสั่งผลิตสินค้า</title>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<!-- ===== SIDEBAR NAV ===== -->
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <span class="logo-icon">🏭</span>
+    <span class="logo-text">Production<br><small>Management</small></span>
+  </div>
+  <ul class="nav-list">
+    <li class="nav-item active" data-page="dashboard" onclick="navigate('dashboard',this)">
+      <span class="nav-icon">📊</span><span>Dashboard</span>
+    </li>
+    <li class="nav-item" data-page="form" onclick="navigate('form',this)">
+      <span class="nav-icon">📝</span><span>ใบสั่งผลิต</span>
+    </li>
+    <li class="nav-item" data-page="history" onclick="navigate('history',this)">
+      <span class="nav-icon">📋</span><span>ประวัติออเดอร์</span>
+    </li>
+    <li class="nav-item" data-page="defects" onclick="navigate('defects',this)">
+      <span class="nav-icon">⚠️</span><span>ของเสียรายวัน</span>
+    </li>
+    <li class="nav-item" data-page="masters" onclick="navigate('masters',this)">
+      <span class="nav-icon">⚙️</span><span>ข้อมูลหลัก</span>
+    </li>
+  </ul>
+</nav>
+
+<!-- ===== MAIN ===== -->
+<div class="main-wrap">
+
+  <!-- top bar -->
+  <header class="topbar">
+    <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+    <div class="topbar-title" id="topbarTitle">Dashboard</div>
+    <div class="topbar-actions" id="topbarActions">
+      <div id="syncStatus" class="sync-status" title="สถานะการเชื่อมต่อ">
+        <span id="syncDot" class="sync-dot offline"></span>
+        <span id="syncLabel">Offline</span>
+        <span id="syncBadge" class="sync-badge" style="display:none;"></span>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="openSettingsModal()" title="ตั้งค่าการเชื่อมต่อ">⚙️ ตั้งค่า</button>
+    </div>
+  </header>
+
+  <!-- pages -->
+  <main class="content">
+
+    <!-- ══════════════════════════════════════════
+         PAGE: DASHBOARD
+    ══════════════════════════════════════════ -->
+    <div id="page-dashboard" class="page active">
+
+      <!-- ── Period selector ── -->
+      <div class="dash-period-bar">
+        <div class="period-tabs">
+          <button class="period-tab active" id="tab-current" onclick="switchPeriod('current',this)">ภาพรวมปัจจุบัน</button>
+          <button class="period-tab" id="tab-monthly" onclick="switchPeriod('monthly',this)">ย้อนหลังรายเดือน</button>
+          <button class="period-tab" id="tab-order" onclick="switchPeriod('order',this)">รายละเอียดต่อออเดอร์</button>
+        </div>
+        <!-- month picker (hidden by default) -->
+        <div id="monthPickerWrap" style="display:none;align-items:center;gap:8px;">
+          <button class="period-nav-btn" onclick="shiftMonth(-1)">‹</button>
+          <select id="monthPicker" onchange="renderDashboard()" class="period-select"></select>
+          <select id="yearPicker"  onchange="renderDashboard()" class="period-select"></select>
+          <button class="period-nav-btn" onclick="shiftMonth(1)">›</button>
+        </div>
+        <!-- order search (hidden by default) -->
+        <div id="orderSearchWrap" style="display:none;align-items:center;gap:8px;">
+          <input type="text" id="orderSearchInput" class="period-search"
+                 placeholder="🔍 ค้นหาออเดอร์ / ลูกค้า / สินค้า..."
+                 oninput="renderOrderDashboard()"/>
+        </div>
+      </div>
+
+      <!-- ── Current view ── -->
+      <div id="dash-current">
+        <div class="kpi-row" id="kpiRow"></div>
+        <div class="dash-grid">
+          <div class="dash-card">
+            <div class="dash-card-title">📉 ของเสียรายวัน (14 วันล่าสุด)</div>
+            <div id="defectChart" class="chart-area"></div>
+          </div>
+          <div class="dash-card">
+            <div class="dash-card-title">📦 % Yield 10 ออเดอร์ล่าสุด</div>
+            <div id="yieldChart" class="chart-area"></div>
+          </div>
+        </div>
+        <div class="dash-card" style="margin-top:20px;">
+          <div class="dash-card-title">🕐 ออเดอร์ล่าสุด</div>
+          <div id="recentOrders"></div>
+        </div>
+        <div class="dash-card" style="margin-top:20px;">
+          <div class="dash-card-title">🚚 ใกล้กำหนดส่ง (7 วัน)</div>
+          <div id="upcomingDeliveries"></div>
+        </div>
+      </div>
+
+      <!-- ── Monthly view ── -->
+      <div id="dash-monthly" style="display:none;">
+        <div class="kpi-row" id="kpiRowMonthly"></div>
+        <div class="dash-grid">
+          <div class="dash-card">
+            <div class="dash-card-title" id="defectChartMonthlyTitle">📉 ของเสียรายวัน</div>
+            <div id="defectChartMonthly" class="chart-area"></div>
+          </div>
+          <div class="dash-card">
+            <div class="dash-card-title">📦 % Yield ต่อออเดอร์ในเดือนนี้</div>
+            <div id="yieldChartMonthly" class="chart-area"></div>
+          </div>
+        </div>
+        <div class="dash-card" style="margin-top:20px;">
+          <div class="dash-card-title">� ออเดอร์ในเดือนนี้</div>
+          <div id="monthlyOrderTable"></div>
+        </div>
+        <div class="dash-card" style="margin-top:20px;">
+          <div class="dash-card-title">⚠️ ของเสียรายวันในเดือนนี้</div>
+          <div id="monthlyDefectTable"></div>
+        </div>
+      </div>
+
+      <!-- ── Per-order view ── -->
+      <div id="dash-order" style="display:none;">
+        <div id="orderDashList"></div>
+      </div>
+
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         PAGE: FORM
+    ══════════════════════════════════════════ -->
+    <div id="page-form" class="page">
+      <div class="form-header">
+        <div>
+          <h2 id="formTitle">➕ สร้างใบสั่งผลิตใหม่</h2>
+          <p class="form-subtitle" id="formSubtitle">กรอกข้อมูลให้ครบถ้วนแล้วกดบันทึก</p>
+        </div>
+        <input type="hidden" id="editId"/>
+      </div>
+
+      <form id="productionForm" novalidate>
+
+        <!-- 1. เอกสาร -->
+        <div class="section">
+          <div class="section-title"><span>📄</span> ข้อมูลเอกสาร</div>
+          <div class="grid grid-3">
+            <div class="field">
+              <label>เลขใบสั่งผลิต <span class="req">*</span></label>
+              <div class="input-with-btn">
+                <input type="text" id="productionOrderNo" placeholder="PO-2026-0001" required/>
+                <button type="button" class="gen-btn" onclick="genNo('productionOrderNo','PO')" title="สร้างเลขอัตโนมัติ">⚡</button>
+              </div>
+            </div>
+            <div class="field">
+              <label>หมายเลขเอกสาร <span class="req">*</span></label>
+              <div class="input-with-btn">
+                <input type="text" id="documentNo" placeholder="DOC-2026-0001" required/>
+                <button type="button" class="gen-btn" onclick="genNo('documentNo','DOC')" title="สร้างเลขอัตโนมัติ">⚡</button>
+              </div>
+            </div>
+            <div class="field">
+              <label>วันที่ผลิต <span class="req">*</span></label>
+              <div class="date-input-wrap" id="wrap-productionDate">
+                <input class="date-dd" type="number" placeholder="วว" min="1" max="31" maxlength="2" data-date-part="dd" data-target="productionDate"/>
+                <span class="date-sep">/</span>
+                <input class="date-mm" type="number" placeholder="ดด" min="1" max="12" maxlength="2" data-date-part="mm" data-target="productionDate"/>
+                <span class="date-sep">/</span>
+                <input class="date-yyyy" type="number" placeholder="ปปปป" min="2000" max="2100" maxlength="4" data-date-part="yyyy" data-target="productionDate"/>
+              </div>
+              <input type="hidden" id="productionDate" required/>
+            </div>
+            <div class="field">
+              <label>เลข Lot <span class="req">*</span></label>
+              <input type="text" id="lotNo" placeholder="LOT-001" required/>
+            </div>
+            <div class="field">
+              <label>กำหนดส่ง <span class="req">*</span></label>
+              <div class="date-input-wrap" id="wrap-deliveryDate">
+                <input class="date-dd" type="number" placeholder="วว" min="1" max="31" maxlength="2" data-date-part="dd" data-target="deliveryDate"/>
+                <span class="date-sep">/</span>
+                <input class="date-mm" type="number" placeholder="ดด" min="1" max="12" maxlength="2" data-date-part="mm" data-target="deliveryDate"/>
+                <span class="date-sep">/</span>
+                <input class="date-yyyy" type="number" placeholder="ปปปป" min="2000" max="2100" maxlength="4" data-date-part="yyyy" data-target="deliveryDate"/>
+              </div>
+              <input type="hidden" id="deliveryDate" required/>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. การผลิต -->
+        <div class="section">
+          <div class="section-title"><span>⚙️</span> ข้อมูลการผลิต</div>
+          <div class="grid grid-2">
+            <div class="field">
+              <label>เครื่องจักร <span class="req">*</span></label>
+              <input type="text" id="machine" list="list-machines" placeholder="เลือกหรือพิมพ์" required/>
+              <datalist id="list-machines"></datalist>
+            </div>
+            <div class="field">
+              <label>ชื่อพนักงาน <span class="req">*</span></label>
+              <input type="text" id="operatorName" list="list-operators" placeholder="เลือกหรือพิมพ์" required/>
+              <datalist id="list-operators"></datalist>
+            </div>
+            <div class="field">
+              <label>ชื่อลูกค้า <span class="req">*</span></label>
+              <input type="text" id="customerName" list="list-customers" placeholder="เลือกหรือพิมพ์" required/>
+              <datalist id="list-customers"></datalist>
+            </div>
+            <div class="field">
+              <label>ชื่อสินค้า <span class="req">*</span></label>
+              <input type="text" id="productName" list="list-products" placeholder="เลือกหรือพิมพ์" required
+                     oninput="autoFillCode(this.value)"/>
+              <datalist id="list-products"></datalist>
+            </div>
+            <div class="field">
+              <label>Code สินค้า <span class="req">*</span></label>
+              <input type="text" id="productCode" placeholder="SKU-00123" required/>
+            </div>
+            <div class="field">
+              <label>จำนวนที่สั่ง <span class="req">*</span></label>
+              <input type="number" id="orderQty" placeholder="0" min="0" required oninput="syncQty()"/>
+              <span class="hint">ชิ้น / ม้วน / กก.</span>
+            </div>
+          </div>
+          <div class="grid grid-2" style="margin-top:12px;">
+            <div class="field">
+              <label>ชนิดเม็ดพลาสติก</label>
+              <input type="text" id="plasticType" list="list-plasticTypes" placeholder="เช่น LDPE, HDPE, PP, LLDPE"/>
+              <datalist id="list-plasticTypes">
+                <option value="LDPE"></option>
+                <option value="HDPE"></option>
+                <option value="LLDPE"></option>
+                <option value="PP"></option>
+                <option value="BOPP"></option>
+                <option value="PVC"></option>
+                <option value="PET"></option>
+                <option value="PS"></option>
+              </datalist>
+            </div>
+            <div class="field">
+              <label>ขนาดถุง</label>
+              <input type="text" id="bagSize" placeholder="เช่น 30x40 ซม., 12x18 นิ้ว"/>
+            </div>
+            <div class="field">
+              <label>ความหนา (mm)</label>
+              <div class="thickness-wrap">
+                <input type="number" id="thicknessMm" placeholder="0.000" step="0.001" min="0"
+                       oninput="convertThickness('mm')"/>
+                <span class="thickness-arrow">⇄</span>
+                <div class="thickness-micron-wrap">
+                  <input type="number" id="thicknessMicron" placeholder="0" step="0.1" min="0"
+                         oninput="convertThickness('micron')"/>
+                  <span class="thickness-unit">µm</span>
+                </div>
+              </div>
+              <span class="hint">1 mm = 1,000 ไมครอน (µm)</span>
+            </div>
+          </div>
+          <div class="field" style="margin-top:12px;">
+            <label>รายละเอียดสินค้า</label>
+            <textarea id="productDetail" placeholder="ขนาด สี วัสดุ หรือข้อกำหนดพิเศษ..."></textarea>
+          </div>
+        </div>
+
+        <!-- 3. พารามิเตอร์ -->
+        <div class="section">
+          <div class="section-title"><span>🌡️</span> พารามิเตอร์การควบคุมการเป่า</div>
+          <div style="overflow-x:auto;">
+            <table class="param-table">
+              <thead>
+                <tr>
+                  <th>โซน / ตำแหน่ง</th>
+                  <th>อุณหภูมิ</th>
+                  <th>หน่วย</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="zone-label"><span class="zone-badge">1</span>กระบอกส่วนต้น</td>
+                  <td><input type="number" id="temp_front_set" placeholder="0" step="0.1"/></td>
+                  <td class="unit-cell">°C</td>
+                </tr>
+                <tr>
+                  <td class="zone-label"><span class="zone-badge">2</span>กระบอกส่วนกลาง</td>
+                  <td><input type="number" id="temp_mid_set" placeholder="0" step="0.1"/></td>
+                  <td class="unit-cell">°C</td>
+                </tr>
+                <tr>
+                  <td class="zone-label"><span class="zone-badge">3</span>กระบอกส่วนท้าย</td>
+                  <td><input type="number" id="temp_rear_set" placeholder="0" step="0.1"/></td>
+                  <td class="unit-cell">°C</td>
+                </tr>
+                <tr>
+                  <td class="zone-label"><span class="zone-badge">4</span>หน้าแปลน</td>
+                  <td><input type="number" id="temp_flange_set" placeholder="0" step="0.1"/></td>
+                  <td class="unit-cell">°C</td>
+                </tr>
+                <tr>
+                  <td class="zone-label"><span class="zone-badge">5</span>หัวดาย</td>
+                  <td><input type="number" id="temp_die_set" placeholder="0" step="0.1"/></td>
+                  <td class="unit-cell">°C</td>
+                </tr>
+                <tr>
+                  <td class="zone-label" style="color:#c53030;">💥 ระเบิดผิว</td>
+                  <td>
+                    <select id="surfaceBurst_set">
+                      <option value="">-- เลือก --</option>
+                      <option value="ไม่มี">ไม่มี</option>
+                      <option value="มี">มี</option>
+                    </select>
+                  </td>
+                  <td class="unit-cell">—</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 4. จำนวนผลิต -->
+        <div class="section">
+          <div class="section-title"><span>📦</span> จำนวนการผลิตต่อออเดอร์</div>
+          <div class="production-box">
+            <div class="grid grid-3">
+              <div class="field">
+                <label>จำนวนผลิตได้จริง <span class="req">*</span></label>
+                <input type="number" id="actualQty" placeholder="0" min="0" required oninput="computeYield()"/>
+                <span class="hint">หน่วย</span>
+              </div>
+              <div class="field">
+                <label>จำนวนที่สั่ง (อ้างอิง)</label>
+                <input type="number" id="orderQtyRef" readonly class="readonly-input"/>
+              </div>
+              <div class="field">
+                <label>% Yield</label>
+                <input type="text" id="yieldPct" readonly class="readonly-input"/>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. ของเสีย -->
+        <div class="section">
+          <div class="section-title"><span>🗂️</span> ของเสียรวมต่อวัน</div>
+          <div class="defect-box">
+            <div class="grid grid-3">
+              <div class="field">
+                <label>วันที่บันทึก <span class="req">*</span></label>
+                <div class="date-input-wrap" id="wrap-defectDate">
+                  <input class="date-dd" type="number" placeholder="วว" min="1" max="31" data-date-part="dd" data-target="defectDate"/>
+                  <span class="date-sep">/</span>
+                  <input class="date-mm" type="number" placeholder="ดด" min="1" max="12" data-date-part="mm" data-target="defectDate"/>
+                  <span class="date-sep">/</span>
+                  <input class="date-yyyy" type="number" placeholder="ปปปป" min="2000" max="2100" data-date-part="yyyy" data-target="defectDate"/>
+                </div>
+                <input type="hidden" id="defectDate" required/>
+              </div>
+              <div class="field">
+                <label>จำนวนของเสียรวม <span class="req">*</span></label>
+                <input type="number" id="dailyDefectQty" placeholder="0" min="0" required/>
+                <span class="hint">ชิ้น / หน่วย</span>
+              </div>
+              <div class="field">
+                <label>ประเภทของเสียหลัก</label>
+                <input type="text" id="defectType" placeholder="เช่น ระเบิดผิว, สีไม่สม่ำเสมอ"/>
+              </div>
+            </div>
+            <div class="field" style="margin-top:12px;">
+              <label>หมายเหตุของเสีย</label>
+              <textarea id="defectRemark" placeholder="รายละเอียดเพิ่มเติม..."></textarea>
+            </div>
+            <div class="defect-note">⚠️ บันทึกของเสียเป็น <strong>รวมต่อวัน</strong> ไม่แยกต่อออเดอร์</div>
+          </div>
+        </div>
+
+        <!-- buttons -->
+        <div class="btn-row">
+          <button type="button" class="btn btn-ghost" onclick="cancelEdit()">ยกเลิก</button>
+          <button type="button" class="btn btn-outline" onclick="clearForm()">🗑️ ล้างข้อมูล</button>
+          <button type="button" class="btn btn-secondary" onclick="window.print()">🖨️ พิมพ์</button>
+          <button type="submit" class="btn btn-primary">💾 บันทึกใบสั่งผลิต</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         PAGE: HISTORY
+    ══════════════════════════════════════════ -->
+    <div id="page-history" class="page">
+      <div class="page-toolbar">
+        <div class="search-wrap">
+          <input type="text" id="searchInput" placeholder="🔍 ค้นหา ลูกค้า / สินค้า / เลขออเดอร์ / Lot..."
+                 oninput="renderHistory()"/>
+        </div>
+        <div class="filter-wrap">
+          <input type="date" id="filterFrom" onchange="renderHistory()" title="จากวันที่"/>
+          <span style="color:#718096;">—</span>
+          <input type="date" id="filterTo" onchange="renderHistory()" title="ถึงวันที่"/>
+          <button class="btn btn-outline btn-sm" onclick="clearFilters()">ล้างตัวกรอง</button>
+          <button class="btn btn-primary btn-sm" onclick="exportOrders()">⬇️ Export CSV</button>
+        </div>
+      </div>
+      <div id="historyTable"></div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         PAGE: DEFECTS
+    ══════════════════════════════════════════ -->
+    <div id="page-defects" class="page">
+      <div class="page-toolbar">
+        <h3 style="margin:0;">บันทึกของเสียรายวัน</h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-primary btn-sm" onclick="openDefectModal()">➕ เพิ่มรายการ</button>
+          <button class="btn btn-outline btn-sm" onclick="exportDefects()">⬇️ Export CSV</button>
+        </div>
+      </div>
+      <div id="defectTable"></div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         PAGE: MASTERS
+    ══════════════════════════════════════════ -->
+    <div id="page-masters" class="page">
+      <div class="masters-grid">
+        <div class="master-card">
+          <div class="master-title">👥 ลูกค้า</div>
+          <div id="masterCustomers"></div>
+          <div class="master-add">
+            <input type="text" id="newCustomer" placeholder="ชื่อลูกค้าใหม่"/>
+            <button class="btn btn-primary btn-sm" onclick="addMaster('customers','newCustomer')">เพิ่ม</button>
+          </div>
+        </div>
+        <div class="master-card">
+          <div class="master-title">📦 สินค้า</div>
+          <div id="masterProducts"></div>
+          <div class="master-add">
+            <input type="text" id="newProductName" placeholder="ชื่อสินค้า"/>
+            <input type="text" id="newProductCode" placeholder="Code"/>
+            <button class="btn btn-primary btn-sm" onclick="addProduct()">เพิ่ม</button>
+          </div>
+        </div>
+        <div class="master-card">
+          <div class="master-title">🏗️ เครื่องจักร</div>
+          <div id="masterMachines"></div>
+          <div class="master-add">
+            <input type="text" id="newMachine" placeholder="ชื่อเครื่องจักร"/>
+            <button class="btn btn-primary btn-sm" onclick="addMaster('machines','newMachine')">เพิ่ม</button>
+          </div>
+        </div>
+        <div class="master-card">
+          <div class="master-title">👷 พนักงาน</div>
+          <div id="masterOperators"></div>
+          <div class="master-add">
+            <input type="text" id="newOperator" placeholder="ชื่อ-นามสกุล"/>
+            <button class="btn btn-primary btn-sm" onclick="addMaster('operators','newOperator')">เพิ่ม</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ===== MODAL: Settings ===== -->
+<div id="settingsModal" class="modal-overlay" onclick="closeSettingsModal(event)">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>⚙️ ตั้งค่าการเชื่อมต่อ Google Sheets</h3>
+      <button class="modal-close" onclick="closeSettingsModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="settings-steps">
+        <div class="step-item">
+          <div class="step-num">1</div>
+          <div>เปิด <strong>Google Sheets</strong> → สร้าง Spreadsheet ใหม่</div>
+        </div>
+        <div class="step-item">
+          <div class="step-num">2</div>
+          <div>ไปที่ <strong>Extensions → Apps Script</strong> → วางโค้ดจากไฟล์ <code>google-apps-script.js</code></div>
+        </div>
+        <div class="step-item">
+          <div class="step-num">3</div>
+          <div>กด <strong>Deploy → New deployment</strong> → เลือก Web App<br/>
+            <small style="color:#718096;">Execute as: <b>Me</b> &nbsp;|&nbsp; Who has access: <b>Anyone</b></small>
+          </div>
+        </div>
+        <div class="step-item">
+          <div class="step-num">4</div>
+          <div>คัดลอก <strong>Web App URL</strong> แล้ววางด้านล่าง</div>
+        </div>
+      </div>
+      <div class="field" style="margin-top:16px;">
+        <label>Google Apps Script Web App URL</label>
+        <input type="url" id="gasUrlInput" placeholder="https://script.google.com/macros/s/.../exec"/>
+      </div>
+      <div id="syncTestResult" style="margin-top:10px;font-size:0.82rem;"></div>
+    </div>
+    <div class="modal-footer" style="justify-content:space-between;">
+      <button class="btn btn-danger btn-sm" onclick="disconnectGAS()">🔌 ยกเลิกการเชื่อมต่อ</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-outline" onclick="testConnection()">🔍 ทดสอบ</button>
+        <button class="btn btn-primary" onclick="saveGasUrl()">💾 บันทึก</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: Order Detail ===== -->
+<div id="orderDetailModal" class="modal-overlay" onclick="closeOrderDetail(event)">
+  <div class="modal-box modal-lg">
+    <div class="modal-header">
+      <h3 id="orderDetailTitle">📋 รายละเอียดออเดอร์</h3>
+      <button class="modal-close" onclick="closeOrderDetail()">✕</button>
+    </div>
+    <div class="modal-body" id="orderDetailBody" style="max-height:75vh;overflow-y:auto;"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeOrderDetail()">ปิด</button>
+      <button class="btn btn-secondary" id="orderDetailEditBtn">✏️ แก้ไข</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: Defect ===== -->
+<div id="defectModal" class="modal-overlay" onclick="closeDefectModal(event)">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="defectModalTitle">➕ เพิ่มของเสียรายวัน</h3>
+      <button class="modal-close" onclick="closeDefectModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="defectEditId"/>
+      <div class="grid grid-2">
+        <div class="field">
+          <label>วันที่ <span class="req">*</span></label>
+          <div class="date-input-wrap" id="wrap-m_defectDate">
+            <input class="date-dd" type="number" placeholder="วว" min="1" max="31" data-date-part="dd" data-target="m_defectDate"/>
+            <span class="date-sep">/</span>
+            <input class="date-mm" type="number" placeholder="ดด" min="1" max="12" data-date-part="mm" data-target="m_defectDate"/>
+            <span class="date-sep">/</span>
+            <input class="date-yyyy" type="number" placeholder="ปปปป" min="2000" max="2100" data-date-part="yyyy" data-target="m_defectDate"/>
+          </div>
+          <input type="hidden" id="m_defectDate" required/>
+        </div>
+        <div class="field">
+          <label>จำนวนของเสีย <span class="req">*</span></label>
+          <input type="number" id="m_defectQty" placeholder="0" min="0" required/>
+        </div>
+        <div class="field">
+          <label>ประเภทของเสีย</label>
+          <input type="text" id="m_defectType" placeholder="เช่น ระเบิดผิว"/>
+        </div>
+      </div>
+      <div class="field" style="margin-top:12px;">
+        <label>หมายเหตุ</label>
+        <textarea id="m_defectRemark" placeholder="รายละเอียด..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeDefectModal()">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveDefectModal()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== INSTALL BANNER ===== -->
+<div id="installBanner" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#1a365d;color:white;padding:12px 20px;align-items:center;justify-content:space-between;gap:12px;z-index:9998;flex-wrap:wrap;">
+  <span style="font-size:0.88rem;">📲 ติดตั้งแอปบนหน้าจอของคุณ ใช้ได้แม้ไม่มีเน็ต</span>
+  <div style="display:flex;gap:8px;">
+    <button onclick="document.getElementById('installBanner').style.display='none'" style="background:transparent;border:1px solid rgba(255,255,255,0.4);color:white;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.82rem;">ไม่ใช่ตอนนี้</button>
+    <button onclick="installApp()" style="background:#3182ce;border:none;color:white;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:0.82rem;font-weight:700;">ติดตั้ง</button>
+  </div>
+</div>
+
+<!-- ===== TOAST ===== -->
+<div id="toast"></div>
+
+<!-- scripts -->
+<script src="db.js"></script>
+<script src="export.js"></script>
+<script src="chart.js"></script>
+<script src="app.js"></script>
+<script src="keyboard.js"></script>
+<script>
+  // Register Service Worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js')
+      .then(() => console.log('SW registered'))
+      .catch(e => console.warn('SW error:', e));
+  }
+</script>
+</body>
+</html>
