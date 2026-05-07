@@ -256,11 +256,16 @@ function cancelEdit() {
 }
 
 // ── Edit order ────────────────────────────────────────────
-function editOrder(id) {
-  // ดึงจาก cache ก่อน ถ้าไม่มีให้ดึงจาก getAllOrders ที่ sync มาแล้ว
-  const o = DB.getOrderById(id);
+async function editOrder(id) {
+  // ลองหาจาก cache ก่อน ถ้าไม่มีให้ sync ใหม่
+  let o = DB.getOrderById(id);
   if (!o) {
-    showToast('⚠️ ไม่พบข้อมูลออเดอร์ กรุณารีเฟรชหน้าก่อน', '#c05621');
+    showToast('🔄 กำลังโหลดข้อมูล...', '#2b6cb0');
+    await DB.getAllOrders(); // sync จาก Google Sheets มาเก็บใน cache
+    o = DB.getOrderById(id);
+  }
+  if (!o) {
+    showToast('⚠️ ไม่พบข้อมูลออเดอร์', '#c05621');
     return;
   }
 
@@ -849,8 +854,12 @@ function toggleOrderCard(id) {
 }
 
 // ── Order Detail Modal ────────────────────────────────────
-function openOrderDetail(id) {
-  const o = DB.getOrderById(id);
+async function openOrderDetail(id) {
+  let o = DB.getOrderById(id);
+  if (!o) {
+    await DB.getAllOrders();
+    o = DB.getOrderById(id);
+  }
   if (!o) return;
   const p    = o.parameters || {};
   const yNum = parseFloat((o.yieldPct || '0').replace('%','').trim());
@@ -1069,3 +1078,4 @@ function showToast(msg, bg = '#276749') {
   clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => { t.style.display = 'none'; }, 3000);
 }
+
