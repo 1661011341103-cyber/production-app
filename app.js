@@ -257,8 +257,12 @@ function cancelEdit() {
 
 // ── Edit order ────────────────────────────────────────────
 function editOrder(id) {
+  // ดึงจาก cache ก่อน ถ้าไม่มีให้ดึงจาก getAllOrders ที่ sync มาแล้ว
   const o = DB.getOrderById(id);
-  if (!o) return;
+  if (!o) {
+    showToast('⚠️ ไม่พบข้อมูลออเดอร์ กรุณารีเฟรชหน้าก่อน', '#c05621');
+    return;
+  }
 
   navigate('form', document.querySelector('[data-page="form"]'));
   document.getElementById('editId').value = o.id;
@@ -282,19 +286,25 @@ function editOrder(id) {
   // parameters
   const p = o.parameters || {};
   const paramMap = {
-    temp_front_set:      p.temp_front?.set,
-    temp_mid_set:        p.temp_mid?.set,
-    temp_rear_set:       p.temp_rear?.set,
-    temp_flange_set:     p.temp_flange?.set,
-    temp_die_set:        p.temp_die?.set,
-    surfaceBurst_set:    p.surfaceBurst?.set,
+    temp_front_set:   p.temp_front?.set,
+    temp_mid_set:     p.temp_mid?.set,
+    temp_rear_set:    p.temp_rear?.set,
+    temp_flange_set:  p.temp_flange?.set,
+    temp_die_set:     p.temp_die?.set,
+    surfaceBurst_set: p.surfaceBurst?.set,
   };
   Object.entries(paramMap).forEach(([k, val]) => {
     const el = document.getElementById(k);
     if (el && val !== undefined) el.value = val;
   });
 
+  // thickness — sync micron จาก mm ถ้ามีค่า
+  if (o.thicknessMm) convertThickness('mm');
+
   syncQty();
+
+  // scroll ขึ้นบนสุด
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 async function deleteOrder(id) {
