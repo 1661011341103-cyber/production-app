@@ -38,6 +38,21 @@ document.addEventListener('DOMContentLoaded', () => {
   renderDashboard();
 
   document.getElementById('productionForm').addEventListener('submit', handleFormSubmit);
+
+  // ── Event delegation สำหรับปุ่มในตาราง ──────────────────
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const id     = btn.dataset.id;
+    if (!id) return;
+
+    if (action === 'edit')           editOrder(id);
+    if (action === 'delete')         deleteOrder(id);
+    if (action === 'edit-defect')    openDefectModal(id);
+    if (action === 'delete-defect')  deleteDefectRow(id);
+    if (action === 'view-order')     openOrderDetail(id);
+  });
 });
 
 function setDefaultDates() {
@@ -362,8 +377,8 @@ async function renderHistory() {
       <td><span class="badge ${delivBadge}">${delivText}</span></td>
       <td>
         <div class="actions">
-          <button class="btn btn-outline btn-icon" onclick="editOrder('${o.id}')" title="แก้ไข">✏️</button>
-          <button class="btn btn-danger btn-icon" onclick="deleteOrder('${o.id}')" title="ลบ">🗑️</button>
+          <button class="btn btn-outline btn-icon" data-action="edit" data-id="${esc(o.id)}" title="แก้ไข">✏️</button>
+          <button class="btn btn-danger btn-icon"  data-action="delete" data-id="${esc(o.id)}" title="ลบ">🗑️</button>
         </div>
       </td>
     </tr>`;
@@ -422,8 +437,8 @@ async function renderDefectTable() {
     <td>${esc(d.defectRemark) || '—'}</td>
     <td>
       <div class="actions">
-        <button class="btn btn-outline btn-icon" onclick="openDefectModal('${d.id}')" title="แก้ไข">✏️</button>
-        <button class="btn btn-danger btn-icon" onclick="deleteDefectRow('${d.id}')" title="ลบ">🗑️</button>
+        <button class="btn btn-outline btn-icon" data-action="edit-defect" data-id="${esc(d.id)}" title="แก้ไข">✏️</button>
+        <button class="btn btn-danger btn-icon"  data-action="delete-defect" data-id="${esc(d.id)}" title="ลบ">🗑️</button>
       </div>
     </td>
   </tr>`).join('');
@@ -838,8 +853,8 @@ async function renderOrderDashboard() {
           </tbody>
         </table>
         <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end;">
-          <button class="btn btn-outline btn-sm" onclick="openOrderDetail('${o.id}')">🔍 ดูเต็ม</button>
-          <button class="btn btn-primary btn-sm" onclick="editOrder('${o.id}')">✏️ แก้ไข</button>
+          <button class="btn btn-outline btn-sm" data-action="view-order" data-id="${esc(o.id)}">🔍 ดูเต็ม</button>
+          <button class="btn btn-primary btn-sm" data-action="edit" data-id="${esc(o.id)}">✏️ แก้ไข</button>
         </div>
       </div>
     </div>`;
@@ -866,7 +881,7 @@ async function openOrderDetail(id) {
   const yCls = yNum >= 95 ? 'badge-green' : yNum >= 80 ? 'badge-orange' : 'badge-red';
 
   document.getElementById('orderDetailTitle').textContent = `📋 ${o.productionOrderNo}`;
-  document.getElementById('orderDetailEditBtn').onclick = () => { closeOrderDetail(); editOrder(id); };
+  document.getElementById('orderDetailEditBtn').dataset.id = id;
 
   document.getElementById('orderDetailBody').innerHTML = `
     <div class="od-section">
@@ -932,12 +947,12 @@ function miniOrderTable(orders, showDetail = false) {
       const yNum = parseFloat((o.yieldPct||'0').replace('%','').trim());
       const cls  = yNum >= 95 ? 'badge-green' : yNum >= 80 ? 'badge-orange' : 'badge-red';
       return `<tr>
-        <td><strong style="cursor:pointer;color:#2b6cb0;" onclick="openOrderDetail('${o.id}')">${esc(o.productionOrderNo)}</strong></td>
+        <td><strong style="cursor:pointer;color:#2b6cb0;" data-action="view-order" data-id="${esc(o.id)}">${esc(o.productionOrderNo)}</strong></td>
         <td>${esc(o.customerName)}</td>
         <td>${esc(o.productName)}</td>
         <td>${esc(o.productionDate)}</td>
         <td><span class="badge ${cls}">${esc(o.yieldPct)||'—'}</span></td>
-        ${showDetail ? `<td><button class="btn btn-outline btn-sm" onclick="openOrderDetail('${o.id}')">🔍</button></td>` : ''}
+        ${showDetail ? `<td><button class="btn btn-outline btn-sm" data-action="view-order" data-id="${esc(o.id)}">🔍</button></td>` : ''}
       </tr>`;
     }).join('')}</tbody>
   </table>`;
@@ -1078,4 +1093,3 @@ function showToast(msg, bg = '#276749') {
   clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => { t.style.display = 'none'; }, 3000);
 }
-
