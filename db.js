@@ -54,12 +54,13 @@ async function getAllOrders() {
     try {
       _onSyncStart();
       const data = await gasGet('getOrders');
-      lsSave(DB_KEY_ORDERS, data); // cache locally
+      const arr = Array.isArray(data) ? data : [];
+      lsSave(DB_KEY_ORDERS, arr);
       _onSyncEnd(true);
-      return data;
+      return arr;
     } catch (e) {
       _onSyncEnd(false, e.message);
-      return lsLoad(DB_KEY_ORDERS); // fallback to cache
+      return lsLoad(DB_KEY_ORDERS);
     }
   }
   return lsLoad(DB_KEY_ORDERS);
@@ -75,9 +76,10 @@ async function saveOrder(order) {
 
   // update local cache immediately (optimistic)
   const local = lsLoad(DB_KEY_ORDERS);
-  const idx   = local.findIndex(o => o.id === order.id);
-  if (idx >= 0) local[idx] = order; else local.unshift(order);
-  lsSave(DB_KEY_ORDERS, local);
+  const arr   = Array.isArray(local) ? local : [];
+  const idx   = arr.findIndex(o => o.id === order.id);
+  if (idx >= 0) arr[idx] = order; else arr.unshift(order);
+  lsSave(DB_KEY_ORDERS, arr);
 
   if (isOnline()) {
     try {
@@ -93,8 +95,9 @@ async function saveOrder(order) {
 }
 
 async function deleteOrder(id) {
-  const local = lsLoad(DB_KEY_ORDERS).filter(o => o.id !== id);
-  lsSave(DB_KEY_ORDERS, local);
+  const local = lsLoad(DB_KEY_ORDERS);
+  const arr   = Array.isArray(local) ? local : [];
+  lsSave(DB_KEY_ORDERS, arr.filter(o => o.id !== id));
 
   if (isOnline()) {
     try {
@@ -119,9 +122,10 @@ async function getAllDefects() {
     try {
       _onSyncStart();
       const data = await gasGet('getDefects');
-      lsSave(DB_KEY_DEFECTS, data);
+      const arr = Array.isArray(data) ? data : [];
+      lsSave(DB_KEY_DEFECTS, arr);
       _onSyncEnd(true);
-      return data;
+      return arr;
     } catch (e) {
       _onSyncEnd(false, e.message);
       return lsLoad(DB_KEY_DEFECTS);
@@ -135,9 +139,10 @@ async function saveDefect(defect) {
   if (!defect.id) { defect.id = Date.now().toString(); defect.createdAt = now; }
 
   const local = lsLoad(DB_KEY_DEFECTS);
-  const idx   = local.findIndex(d => d.id === defect.id);
-  if (idx >= 0) local[idx] = defect; else local.unshift(defect);
-  lsSave(DB_KEY_DEFECTS, local);
+  const arr   = Array.isArray(local) ? local : [];
+  const idx   = arr.findIndex(d => d.id === defect.id);
+  if (idx >= 0) arr[idx] = defect; else arr.unshift(defect);
+  lsSave(DB_KEY_DEFECTS, arr);
 
   if (isOnline()) {
     try {
@@ -153,7 +158,9 @@ async function saveDefect(defect) {
 }
 
 async function deleteDefect(id) {
-  lsSave(DB_KEY_DEFECTS, lsLoad(DB_KEY_DEFECTS).filter(d => d.id !== id));
+  const local = lsLoad(DB_KEY_DEFECTS);
+  const arr   = Array.isArray(local) ? local : [];
+  lsSave(DB_KEY_DEFECTS, arr.filter(d => d.id !== id));
   if (isOnline()) {
     try {
       _onSyncStart();
