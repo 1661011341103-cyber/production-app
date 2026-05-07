@@ -109,6 +109,7 @@ async function deleteOrder(id) {
 }
 
 function getOrderById(id) {
+  // อ่านจาก localStorage cache (ซึ่ง getAllOrders จะ sync มาไว้แล้ว)
   return lsLoad(DB_KEY_ORDERS).find(o => o.id === id) || null;
 }
 
