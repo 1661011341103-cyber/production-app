@@ -1,6 +1,10 @@
 // ===== app.js — Main Application Logic =====
 
-// ── Navigation ────────────────────────────────────────────
+// ── In-memory cache สำหรับ orders และ defects ที่โหลดมาแล้ว ──
+let _cachedOrders  = null;
+let _cachedDefects = null;
+
+
 function navigate(page, el) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -272,12 +276,13 @@ function cancelEdit() {
 
 // ── Edit order ────────────────────────────────────────────
 async function editOrder(id) {
-  // ลองหาจาก cache ก่อน ถ้าไม่มีให้ sync ใหม่
-  let o = DB.getOrderById(id);
+  // หาจาก memory cache ก่อน (เร็วที่สุด)
+  let o = _cachedOrders?.find(x => x.id === id);
   if (!o) {
+    // ถ้าไม่มีใน cache ให้ sync ใหม่
     showToast('🔄 กำลังโหลดข้อมูล...', '#2b6cb0');
-    await DB.getAllOrders(); // sync จาก Google Sheets มาเก็บใน cache
-    o = DB.getOrderById(id);
+    _cachedOrders = await DB.getAllOrders();
+    o = _cachedOrders?.find(x => x.id === id);
   }
   if (!o) {
     showToast('⚠️ ไม่พบข้อมูลออเดอร์', '#c05621');
@@ -330,6 +335,7 @@ async function editOrder(id) {
 async function deleteOrder(id) {
   if (!confirm('ต้องการลบใบสั่งผลิตนี้หรือไม่?')) return;
   await DB.deleteOrder(id);
+  _cachedOrders = null; // clear cache
   renderHistory();
   showToast('🗑️ ลบเรียบร้อยแล้ว', '#c05621');
 }
@@ -343,7 +349,9 @@ async function renderHistory() {
   const wrap = document.getElementById('historyTable');
   wrap.innerHTML = `<div class="empty-state"><div class="empty-icon">🔄</div>กำลังโหลด...</div>`;
 
-  let orders = (await DB.getAllOrders()).filter(o => {
+  _cachedOrders = await DB.getAllOrders();
+
+  let orders = _cachedOrders.filter(o => {
     const text = [o.productionOrderNo, o.documentNo, o.customerName,
                   o.productName, o.productCode, o.lotNo, o.operatorName]
                   .join(' ').toLowerCase();
@@ -422,7 +430,8 @@ async function exportOrders() {
 
 // ── DEFECT PAGE ───────────────────────────────────────────
 async function renderDefectTable() {
-  const defects = await DB.getAllDefects();
+  _cachedDefects = await DB.getAllDefects();
+  const defects = _cachedDefects;
   const wrap    = document.getElementById('defectTable');
 
   if (!defects.length) {
@@ -470,7 +479,7 @@ async function openDefectModal(id) {
   document.getElementById('defectModalTitle').textContent = '➕ เพิ่มของเสียรายวัน';
 
   if (id) {
-    const allD = await DB.getAllDefects();
+    const allD = _cachedDefects || await DB.getAllDefects();
     const d = allD.find(x => x.id === id);
     if (d) {
       document.getElementById('defectEditId').value  = d.id;
@@ -510,6 +519,7 @@ async function saveDefectModal() {
 async function deleteDefectRow(id) {
   if (!confirm('ต้องการลบรายการนี้หรือไม่?')) return;
   await DB.deleteDefect(id);
+  _cachedDefects = null; // clear cache
   renderDefectTable();
   showToast('🗑️ ลบเรียบร้อยแล้ว', '#c05621');
 }
@@ -655,8 +665,10 @@ function renderDashboard() {
 }
 
 async function renderCurrentDashboard() {
-  const orders  = await DB.getAllOrders();
-  const defects = await DB.getAllDefects();
+  const orders  = _cachedOrders  || await DB.getAllOrders();
+  const defects = _cachedDefects || await DB.getAllDefects();
+  _cachedOrders  = orders;
+  _cachedDefects = defects;
 
   // KPI
   const totalOrders   = orders.length;
@@ -730,8 +742,10 @@ async function renderMonthlyDashboard() {
   const yyyy = document.getElementById('yearPicker').value;
   const prefix = `${yyyy}-${mm}`;
 
-  const allOrders  = await DB.getAllOrders();
-  const allDefects = await DB.getAllDefects();
+  const allOrders  = _cachedOrders  || await DB.getAllOrders();
+  const allDefects = _cachedDefects || await DB.getAllDefects();
+  _cachedOrders  = allOrders;
+  _cachedDefects = allDefects;
 
   const orders  = allOrders.filter(o  => (o.productionDate || '').startsWith(prefix));
   const defects = allDefects.filter(d => (d.defectDate     || '').startsWith(prefix));
@@ -796,7 +810,9 @@ async function renderMonthlyDashboard() {
 // ── Per-order dashboard ───────────────────────────────────
 async function renderOrderDashboard() {
   const q = (document.getElementById('orderSearchInput')?.value || '').toLowerCase();
-  let orders = await DB.getAllOrders();
+  const allOrders = _cachedOrders || await DB.getAllOrders();
+  _cachedOrders = allOrders;
+  let orders = allOrders;
   if (q) {
     orders = orders.filter(o =>
       [o.productionOrderNo, o.documentNo, o.customerName,
@@ -870,10 +886,10 @@ function toggleOrderCard(id) {
 
 // ── Order Detail Modal ────────────────────────────────────
 async function openOrderDetail(id) {
-  let o = DB.getOrderById(id);
+  let o = _cachedOrders?.find(x => x.id === id);
   if (!o) {
-    await DB.getAllOrders();
-    o = DB.getOrderById(id);
+    _cachedOrders = await DB.getAllOrders();
+    o = _cachedOrders?.find(x => x.id === id);
   }
   if (!o) return;
   const p    = o.parameters || {};
