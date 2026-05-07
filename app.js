@@ -323,7 +323,6 @@ async function renderHistory() {
     return true;
   });
 
-  const wrap = document.getElementById('historyTable');
   if (!orders.length) {
     wrap.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div>ยังไม่มีข้อมูลออเดอร์</div>`;
     return;
