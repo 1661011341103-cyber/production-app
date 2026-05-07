@@ -596,9 +596,21 @@
 <script>
   // Register Service Worker
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js')
-      .then(() => console.log('SW registered'))
-      .catch(e => console.warn('SW error:', e));
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      // เมื่อมี SW ใหม่พร้อมใช้งาน → activate ทันทีโดยไม่ต้องรอ
+      reg.addEventListener('updatefound', () => {
+        const newSW = reg.installing;
+        newSW.addEventListener('statechange', () => {
+          if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+            newSW.postMessage({ type: 'SKIP_WAITING' });
+          }
+        });
+      });
+    });
+    // เมื่อ SW ใหม่ activate แล้ว → reload หน้าอัตโนมัติ
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      window.location.reload();
+    });
   }
 </script>
 </body>
