@@ -25,18 +25,32 @@ function lsSave(key, data)    { localStorage.setItem(key, JSON.stringify(data));
 
 // ── HTTP helpers ──────────────────────────────────────────
 async function gasGet(action) {
-  const res = await fetch(`${GAS_URL}?action=${action}`);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  return new Promise((resolve, reject) => {
+    const cbName = '_cb_' + Date.now();
+    const script = document.createElement('script');
+    window[cbName] = (data) => {
+      delete window[cbName];
+      document.body.removeChild(script);
+      resolve(data);
+    };
+    script.onerror = () => {
+      delete window[cbName];
+      document.body.removeChild(script);
+      reject(new Error('Script load error'));
+    };
+    script.src = `${GAS_URL}?action=${action}&callback=${cbName}`;
+    document.body.appendChild(script);
+  });
 }
 
 async function gasPost(body) {
+  // POST ผ่าน form submit แบบ no-cors แล้วใช้ GET ตรวจสอบ
   const res = await fetch(GAS_URL, {
     method: 'POST',
-    body:   JSON.stringify(body),
+    mode: 'no-cors',
+    body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  return { ok: true };
 }
 
 // ── Auto-number ───────────────────────────────────────────
